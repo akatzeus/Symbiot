@@ -1,30 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-// import ChatBox from "./Chat";
-import { MessageSquare } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+
 const Navbar = () => {
     const navigate = useNavigate();
-    const [isChatOpen, setIsChatOpen] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
-    const [theme, setTheme] = useState('light');
     const menuRef = useRef(null);
     const [translations, setTranslations] = useState({
-      theme: "Theme",
-      lightMode: "Light Mode",
-      darkMode: "Dark Mode",
+      // Add all text elements that need translation
       language: "Language",
-      logout: "Logout"
+      logout: "Logout",
+      dashboard: "Dashboard",
+      history: "History",
+      statistics: "Statistics",
+      settings: "Settings",
+      agriBot: "Agri Bot"
     });
     
-    // Load theme from localStorage on component mount
+    // Load language on component mount
     useEffect(() => {
-      const storedTheme = localStorage.getItem('mode');
-      if (storedTheme) {
-        setTheme(storedTheme);
-        // Apply theme to document body
-        document.body.classList.toggle('dark-mode', storedTheme === 'dark');
-      }
-      
       // Load language and translate if needed
       const storedLanguage = localStorage.getItem('language');
       if (storedLanguage && storedLanguage !== 'english') {
@@ -54,19 +47,6 @@ const Navbar = () => {
         setShowMenu(false);
       }
     };
-    // const handleCloseChat = () => {
-    //   setIsChatOpen(false);
-    // };
-    const toggleTheme = (newTheme) => {
-      setTheme(newTheme);
-      localStorage.setItem('mode', newTheme); // Save to localStorage
-      document.body.classList.toggle('dark-mode', newTheme === 'dark');
-      
-      // Dispatch a custom event for other components to detect
-      window.dispatchEvent(new CustomEvent('themeChange', { detail: { theme: newTheme } }));
-      
-      setShowMenu(false);
-    };
     
     const translateContent = async (targetLanguage) => {
       try {
@@ -80,7 +60,7 @@ const Navbar = () => {
         const currentPageTranslationKeys = window.currentPageTranslationKeys || [];
         
         // Common navbar translations that are always needed
-        const navbarKeys = ["theme", "lightMode", "darkMode", "language", "logout"];
+        const navbarKeys = ["language", "logout", "dashboard", "history", "statistics", "settings", "agriBot"];
         
         // Combine all keys that need translation for this request
         const allKeys = [...navbarKeys, ...currentPageTranslationKeys];
@@ -90,11 +70,13 @@ const Navbar = () => {
           // Check if the key is from navbar
           if (navbarKeys.includes(key)) {
             const navbarDefaultTexts = {
-              theme: "Theme",
-              lightMode: "Light Mode",
-              darkMode: "Dark Mode",
               language: "Language",
-              logout: "Logout"
+              logout: "Logout",
+              dashboard: "Dashboard",
+              history: "History",
+              statistics: "Statistics",
+              settings: "Settings",
+              agriBot: "Agri Bot"
             };
             return navbarDefaultTexts[key];
           } 
@@ -155,7 +137,6 @@ const Navbar = () => {
               }
             });
     
-            
             // Dispatch a custom event for language change with page translations
             console.log("Dispatching page translations:", pageTranslations);
             window.dispatchEvent(new CustomEvent('languageChange', {
@@ -181,11 +162,13 @@ const Navbar = () => {
       } else {
         // Reset to English
         setTranslations({
-          theme: "Theme",
-          lightMode: "Light Mode",
-          darkMode: "Dark Mode",
           language: "Language",
-          logout: "Logout"
+          logout: "Logout",
+          dashboard: "Dashboard",
+          history: "History",
+          statistics: "Statistics",
+          settings: "Settings",
+          agriBot: "Agri Bot"
         });
         
         // Reset page translations and maintain backward compatibility
@@ -207,132 +190,83 @@ const Navbar = () => {
     };
 
     return (
-        <nav className={`flex w-full items-center justify-between border-t border-b ${theme === 'dark' ? 'border-neutral-800 text-white' : 'border-neutral-200 text-gray-900'} bg-transparent p-2`}>
-           <div className="flex items-center gap-4">
-           <button
-        type="button" // Explicitly set button type
-        onClick={() => setIsChatOpen(true)}
-        className="inline-flex items-center gap-2 text-gray-300 bg-violet-500 border-0 py-2 px-5 focus:outline-none hover:bg-green-800 hover:text-white rounded text-base"
-      >
-        AI Chatbot <MessageSquare size={24} />
-      </button>
-      
-      {isChatOpen && (
-        <ChatBox
-          onClose={handleCloseChat}
-          theme={theme === 'dark' ? 'dark' : 'light'}
-        />
-      )}
-             <div className="flex items-center gap-2">
-             <img 
-  src="/Navlogo.png" 
-  alt="Logo" 
-  className="size-8 rounded-full object-cover transition-transform duration-300 hover:scale-125" 
-/>
-<h1 className="text-2xl font-bold flex items-center whitespace-nowrap" style={{ fontSize: '1.7rem', lineHeight: '1.5rem' }}>
-  Vox<span className="bg-gradient-to-br from-violet-500 to-pink-500 text-transparent bg-clip-text">Biz</span>
-</h1>
-             </div>
-           </div>
+        <nav className="bg-green-600 text-white shadow-lg">
+          <div className="container mx-auto px-4">
+            <div className="flex justify-between h-16">
+              <div className="flex items-center gap-2">
+                <img 
+                  src="/25.jpg" 
+                  alt="Logo" 
+                  className="size-8 rounded-full object-cover transition-transform duration-300 hover:scale-125" 
+                />
+                <span className="text-xl font-bold">{translations.agriBot}</span>
+              </div>
+              
+              <div className="flex items-center space-x-4">
+                <Link to="/dashboard" className="px-3 py-2 rounded hover:bg-green-700">{translations.dashboard}</Link>
+                <Link to="/history" className="px-3 py-2 rounded hover:bg-green-700">{translations.history}</Link>
+                <Link to="/stats" className="px-3 py-2 rounded hover:bg-green-700">{translations.statistics}</Link>
+                <Link to="/settings" className="px-3 py-2 rounded hover:bg-green-700">{translations.settings}</Link>
            
-           <div className="relative" ref={menuRef}>
-             <button 
-               onClick={() => setShowMenu(!showMenu)}
-               className={`${theme === 'dark' ? 'bg-gray-600 hover:bg-gray-700' : 'bg-white hover:bg-gray-100'} p-2 rounded-lg transition-colors`}
-             >
-               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke={theme === 'dark' ? 'white' : '#2563EB'}>
-                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
-               </svg>
-             </button>
-             
-             {showMenu && (
-               <div className={`absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'} ring-1 ring-black ring-opacity-5 z-50`}>
-                 {/* Theme section header */}
-                 <div className={`px-4 py-2 text-xs font-medium border-b ${theme === 'dark' ? 'border-gray-700 text-gray-200' : 'border-gray-200 text-blue-600'}`}>
-                   {translations.theme}
-                 </div>
-                 
-                 {/* Light mode button */}
-                 <button
-                   onClick={() => toggleTheme('light')}
-                   className={`w-full text-left block px-4 py-2 text-xs ${theme === 'dark' 
-                     ? 'text-gray-300 hover:bg-gray-700' 
-                     : 'text-blue-700 hover:bg-gray-100'
-                   }`}
-                 >
-                   {translations.lightMode}
-                 </button>
-                 
-                 {/* Dark mode button */}
-                 <button
-                   onClick={() => toggleTheme('dark')}
-                   className={`w-full text-left block px-4 py-2 text-xs ${theme === 'dark' 
-                     ? 'text-gray-300 hover:bg-gray-700' 
-                     : 'text-blue-700 hover:bg-gray-100'
-                   }`}
-                 >
-                   {translations.darkMode}
-                 </button>
-                 
-                 {/* Language section header */}
-                 <div className={`px-4 py-2 text-xs font-medium border-b border-t ${theme === 'dark' 
-                   ? 'border-gray-700 text-gray-200' 
-                   : 'border-gray-200 text-blue-600'
-                 } mt-2`}>
-                   {translations.language}
-                 </div>
-                 
-                 {/* English language button */}
-                 <button
-                   onClick={() => changeLanguage('english')}
-                   className={`w-full text-left block px-4 py-2 text-xs ${theme === 'dark' 
-                     ? 'text-gray-300 hover:bg-gray-700' 
-                     : 'text-blue-700 hover:bg-gray-100'
-                   }`}
-                 >
-                   English
-                 </button>
-                 
-                 {/* Hindi language button */}
-                 <button
-                   onClick={() => changeLanguage('hindi')}
-                   className={`w-full text-left block px-4 py-2 text-xs ${theme === 'dark' 
-                     ? 'text-gray-300 hover:bg-gray-700' 
-                     : 'text-blue-700 hover:bg-gray-100'
-                   }`}
-                 >
-                   Hindi
-                 </button>
-                 
-                 {/* Kannada language button */}
-                 <button
-                   onClick={() => changeLanguage('kannada')}
-                   className={`w-full text-left block px-4 py-2 text-xs ${theme === 'dark' 
-                     ? 'text-gray-300 hover:bg-gray-700' 
-                     : 'text-blue-700 hover:bg-gray-100'
-                   }`}
-                 >
-                   Kannada
-                 </button>
-                 
-                 {/* Logout divider */}
-                 <div className={`border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'} mt-2`}></div>
-                 
-                 {/* Logout button */}
-                 <button
-                   onClick={() => {/* Logout logic would go here */}}
-                   className={`w-full text-left block px-4 text-xs ${theme === 'dark' 
-                     ? 'text-red-400 hover:bg-gray-700' 
-                     : 'text-red-600 hover:bg-gray-100'
-                   }`}
-                 >
-                   {translations.logout}
-                 </button>
-               </div>
-             )}
-           </div>
-         </nav>
-       );
+                <div className="relative" ref={menuRef}>
+                  <button 
+                    onClick={() => setShowMenu(!showMenu)}
+                    className="px-3 py-2 rounded hover:bg-green-700 transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
+                    </svg>
+                  </button>
+                  
+                  {showMenu && (
+                    <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white text-gray-900 ring-1 ring-black ring-opacity-5 z-50">
+                      {/* Language section header */}
+                      <div className="px-4 py-2 text-xs font-medium border-b border-gray-200 text-green-700">
+                        {translations.language}
+                      </div>
+                      
+                      {/* English language button */}
+                      <button
+                        onClick={() => changeLanguage('english')}
+                        className="w-full text-left block px-4 py-2 text-xs text-green-700 hover:bg-gray-100"
+                      >
+                        English
+                      </button>
+                      
+                      {/* Hindi language button */}
+                      <button
+                        onClick={() => changeLanguage('hindi')}
+                        className="w-full text-left block px-4 py-2 text-xs text-green-700 hover:bg-gray-100"
+                      >
+                        Hindi
+                      </button>
+                      
+                      {/* Kannada language button */}
+                      <button
+                        onClick={() => changeLanguage('kannada')}
+                        className="w-full text-left block px-4 py-2 text-xs text-green-700 hover:bg-gray-100"
+                      >
+                        Kannada
+                      </button>
+                      
+                      {/* Logout divider */}
+                      <div className="border-t border-gray-200 mt-2"></div>
+                      
+                      {/* Logout button */}
+                      <button
+                        onClick={() => {/* Logout logic would go here */}}
+                        className="w-full text-left block px-4 py-2 text-xs text-red-600 hover:bg-gray-100"
+                      >
+                        {translations.logout}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </nav>
+      );
 };
 
 export default Navbar;

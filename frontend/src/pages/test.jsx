@@ -6,7 +6,7 @@ function DiseasePrediction() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [rpiAddress, setRpiAddress] = useState("192.168.255.124:5000");
+  const [rpiAddress, setRpiAddress] = useState("192.168.11.124:5000");
   const [videoError, setVideoError] = useState(false);
 
   const fetchDisease = async () => {
@@ -14,7 +14,7 @@ function DiseasePrediction() {
       setLoading(true);
       setError(null);
       
-      const res = await fetch("/api/disease");
+      const res = await fetch(`http://${rpiAddress}/disease-data`);
       
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 const SignInPage = () => {
   const [formData, setFormData] = useState({
-    username: "",
+    phoneNumber: "",
     password: ""
   });
   const [error, setError] = useState("");
@@ -22,6 +22,14 @@ const SignInPage = () => {
     e.preventDefault();
     setError("");
     setLoading(true);
+
+    // Phone number validation (basic check)
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(formData.phoneNumber)) {
+      setError("Please enter a valid 10-digit phone number");
+      setLoading(false);
+      return;
+    }
 
     try {
       const response = await fetch("http://localhost:5000/api/v1/auth/login", {
@@ -50,13 +58,45 @@ const SignInPage = () => {
     }
   };
 
+  // Function to handle forgot password (can be expanded to send OTP for password reset)
+  const handleForgotPassword = async () => {
+    if (!formData.phoneNumber || !/^\d{10}$/.test(formData.phoneNumber)) {
+      setError("Please enter a valid phone number to reset your password");
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const response = await fetch("http://localhost:5000/api/v1/auth/forgot-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ phoneNumber: formData.phoneNumber }),
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        navigate(`/reset-password?phone=${formData.phoneNumber}`);
+      } else {
+        setError(data.message || "Could not process password reset request.");
+      }
+    } catch (err) {
+      console.error("Password reset error:", err);
+      setError("An error occurred. Please try again later.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="relative h-screen w-full flex flex-col overflow-hidden">
       {/* Background Image */}
       <div
         className="absolute inset-0 z-0"
         style={{
-          backgroundImage: `url("/21.jpg")`,
+          backgroundImage: `url("/24.jpg")`,
           backgroundSize: "cover",
           backgroundPosition: "center"
         }}
@@ -91,15 +131,16 @@ const SignInPage = () => {
           <div className="relative">
             <div className="absolute left-0 top-1/2 -translate-y-1/2">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white/70" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
               </svg>
             </div>
             <input
-              type="text"
-              name="username"
-              value={formData.username}
+              type="tel"
+              name="phoneNumber"
+              value={formData.phoneNumber}
               onChange={handleChange}
-              placeholder="Username"
+              placeholder="Phone Number"
+              pattern="[0-9]{10}"
               className="w-full bg-transparent border-b border-white/40 py-2 pl-8 pr-4 outline-none focus:border-white/70 transition text-white placeholder:text-white/60"
               required
             />
@@ -120,6 +161,16 @@ const SignInPage = () => {
               className="w-full bg-transparent border-b border-white/40 py-2 pl-8 pr-4 outline-none focus:border-white/70 transition text-white placeholder:text-white/60"
               required
             />
+          </div>
+          
+          <div className="flex justify-end">
+            <button 
+              type="button"
+              onClick={handleForgotPassword}
+              className="text-white/70 hover:text-white text-sm"
+            >
+              Forgot Password?
+            </button>
           </div>
           
           <button 

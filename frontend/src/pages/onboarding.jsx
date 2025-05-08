@@ -1,5 +1,17 @@
 import { useState } from 'react';
 import { ChevronRight, ChevronDown, Crop, CloudRain, Bug, Thermometer, DollarSign, BarChart3, Check } from 'lucide-react';
+import Navbar from '../components/Navbar';
+
+// Mock function for submitting data - replace with actual API call
+const submitFarmerData = async (data) => {
+  // Simulate API call
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      console.log("Submitting data:", data);
+      resolve({ success: true });
+    }, 1500);
+  });
+};
 
 export default function FarmerDataCollectionForm() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -7,6 +19,7 @@ export default function FarmerDataCollectionForm() {
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [formErrors, setFormErrors] = useState({});
   
   const [formData, setFormData] = useState({
     // General Information
@@ -70,6 +83,14 @@ export default function FarmerDataCollectionForm() {
       ...formData,
       [field]: value
     });
+    // Clear error when field is updated
+    if (formErrors[field]) {
+      setFormErrors(prev => {
+        const newErrors = {...prev};
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
   };
   
   const handleNestedInputChange = (parent, child, value) => {
@@ -117,10 +138,8 @@ export default function FarmerDataCollectionForm() {
     const itemIndex = currentArray.indexOf(item);
     
     if (itemIndex === -1) {
-      // Add item
       currentArray.push(item);
     } else {
-      // Remove item
       currentArray.splice(itemIndex, 1);
     }
     
@@ -128,30 +147,6 @@ export default function FarmerDataCollectionForm() {
       ...formData,
       [field]: currentArray
     });
-  };
-  
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      // Format data to match backend model if needed
-      const formattedData = {
-        ...formData,
-        // Any other transformations needed
-      };
-      
-      const response = await submitFarmerData(formattedData);
-      console.log("Form data submitted successfully:", response);
-      setFormSubmitted(true);
-    } catch (error) {
-      console.error("Error submitting form:", error);
-      setError(error.message || 'Failed to submit data. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const validateForm = () => {
@@ -174,31 +169,96 @@ export default function FarmerDataCollectionForm() {
     if (formData.primaryCrops.length === 0) {
       errors.primaryCrops = 'At least one crop is required';
     } else {
-      const cropErrors = formData.primaryCrops.some(crop => 
-        !crop.cropName.trim() || !crop.areaAllocated
-      );
-      if (cropErrors) errors.primaryCropsDetails = 'Crop name and area allocated are required for all crops';
+      formData.primaryCrops.forEach((crop, index) => {
+        if (!crop.cropName.trim()) {
+          errors[`primaryCrops_${index}_cropName`] = 'Crop name is required';
+        }
+        if (!crop.areaAllocated) {
+          errors[`primaryCrops_${index}_areaAllocated`] = 'Area allocated is required';
+        }
+      });
     }
     
     return errors;
   };
   
   const nextStep = () => {
-    // If this is the final step (review step), validate entire form
-    if (currentStep === 3) {
-      const errors = validateForm();
-      if (Object.keys(errors).length > 0) {
-        setFormErrors(errors);
-        // Show an error message
-        alert("Please fix the errors before proceeding.");
-        return;
+    // Validate only the current step's required fields
+    const errors = {};
+    
+    if (currentStep === 1) {
+      // Step 1 validation
+      if (!formData.farmerName.trim()) errors.farmerName = 'Farmer name is required';
+      if (!formData.location.trim()) errors.location = 'Location is required';
+      if (!formData.contactNumber.trim()) errors.contactNumber = 'Contact number is required';
+      if (!formData.totalLandSize) errors.totalLandSize = 'Total land size is required';
+      if (!formData.soilType) errors.soilType = 'Soil type is required';
+      if (!formData.irrigationSource) errors.irrigationSource = 'Irrigation source is required';
+      
+      // Email validation if provided
+      if (formData.email && !/^\S+@\S+\.\S+$/.test(formData.email)) {
+        errors.email = 'Please provide a valid email address';
+      }
+    } else if (currentStep === 2) {
+      // Step 2 validation
+      if (formData.primaryCrops.length === 0) {
+        errors.primaryCrops = 'At least one crop is required';
+      } else {
+        formData.primaryCrops.forEach((crop, index) => {
+          if (!crop.cropName.trim()) {
+            errors[`primaryCrops_${index}_cropName`] = 'Crop name is required';
+          }
+          if (!crop.areaAllocated) {
+            errors[`primaryCrops_${index}_areaAllocated`] = 'Area allocated is required';
+          }
+        });
       }
     }
     
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      // Scroll to the first error
+      const firstErrorField = Object.keys(errors)[0];
+      const element = document.querySelector(`[name="${firstErrorField}"]`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
+    
     setCurrentStep(currentStep + 1);
+    setFormErrors({}); // Clear errors when validation passes
   };
-  const prevStep = () => setCurrentStep(currentStep - 1);
   
+  const prevStep = () => {
+    setCurrentStep(currentStep - 1);
+    setFormErrors({}); // Clear errors when going back
+  };
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      // Final validation
+      const errors = validateForm();
+      if (Object.keys(errors).length > 0) {
+        setFormErrors(errors);
+        throw new Error('Please fix the form errors before submitting.');
+      }
+      
+      const response = await submitFarmerData(formData);
+      console.log("Form data submitted successfully:", response);
+      setFormSubmitted(true);
+    } catch (error) {
+      console.error("Error submitting form:", error);
+      setError(error.message || 'Failed to submit data. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Equipment options for checkbox selection
   const equipmentOptions = [
     'Tractor', 'Harvester', 'Plough', 'Seeder', 'Sprinkler System', 
@@ -217,20 +277,21 @@ export default function FarmerDataCollectionForm() {
       case 1:
         return (
           <>
-                  <div className="bg-green-50 p-6 rounded-lg mb-6">
-                  <h2 className="text-xl font-medium text-green-800 mb-2">Farmer Data Collection</h2>
-        <p className="text-green-700 mb-4">
-          This form collects information about your farm to help optimize agricultural practices and provide tailored recommendations.
-        </p>
-        <p className="text-green-700">
-          Fields marked with * are required. Your data will be securely stored and used for analysis and recommendations.
-        </p>
-      </div>
+            <div className="bg-green-50 p-6 rounded-lg mb-6">
+              <h2 className="text-xl font-medium text-green-800 mb-2">Farmer Data Collection</h2>
+              <p className="text-green-700 mb-4">
+                This form collects information about your farm to help optimize agricultural practices and provide tailored recommendations.
+              </p>
+              <p className="text-green-700">
+                Fields marked with * are required. Your data will be securely stored and used for analysis and recommendations.
+              </p>
+            </div>
             <h2 className="text-xl font-bold mb-6">Basic Information</h2>
             
             {/* General Information Section */}
             <div className="mb-6">
               <button 
+                type="button"
                 className="w-full flex items-center justify-between bg-green-50 p-4 rounded-lg mb-4"
                 onClick={() => toggleSection('general')}
               >
@@ -250,11 +311,15 @@ export default function FarmerDataCollectionForm() {
                       <label className="block text-sm font-medium text-gray-700 mb-1">Farmer Name*</label>
                       <input 
                         type="text" 
-                        className="w-full p-2 border border-gray-300 rounded-md"
+                        name="farmerName"
+                        className={`w-full p-2 border ${formErrors.farmerName ? 'border-red-500' : 'border-gray-300'} rounded-md`}
                         value={formData.farmerName}
                         onChange={(e) => handleInputChange('farmerName', e.target.value)}
                         required
                       />
+                      {formErrors.farmerName && (
+                        <p className="mt-1 text-sm text-red-600">{formErrors.farmerName}</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Farm Name</label>
@@ -269,31 +334,42 @@ export default function FarmerDataCollectionForm() {
                       <label className="block text-sm font-medium text-gray-700 mb-1">Location*</label>
                       <input 
                         type="text" 
-                        className="w-full p-2 border border-gray-300 rounded-md"
+                        name="location"
+                        className={`w-full p-2 border ${formErrors.location ? 'border-red-500' : 'border-gray-300'} rounded-md`}
                         placeholder="City, State, Country"
                         value={formData.location}
                         onChange={(e) => handleInputChange('location', e.target.value)}
                         required
                       />
+                      {formErrors.location && (
+                        <p className="mt-1 text-sm text-red-600">{formErrors.location}</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Contact Number*</label>
                       <input 
                         type="tel" 
-                        className="w-full p-2 border border-gray-300 rounded-md"
+                        name="contactNumber"
+                        className={`w-full p-2 border ${formErrors.contactNumber ? 'border-red-500' : 'border-gray-300'} rounded-md`}
                         value={formData.contactNumber}
                         onChange={(e) => handleInputChange('contactNumber', e.target.value)}
                         required
                       />
+                      {formErrors.contactNumber && (
+                        <p className="mt-1 text-sm text-red-600">{formErrors.contactNumber}</p>
+                      )}
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
                       <input 
                         type="email" 
-                        className="w-full p-2 border border-gray-300 rounded-md"
+                        className={`w-full p-2 border ${formErrors.email ? 'border-red-500' : 'border-gray-300'} rounded-md`}
                         value={formData.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
                       />
+                      {formErrors.email && (
+                        <p className="mt-1 text-sm text-red-600">{formErrors.email}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -303,6 +379,7 @@ export default function FarmerDataCollectionForm() {
             {/* Land Details Section */}
             <div className="mb-6">
               <button 
+                type="button"
                 className="w-full flex items-center justify-between bg-green-50 p-4 rounded-lg mb-4"
                 onClick={() => toggleSection('land')}
               >
@@ -323,11 +400,15 @@ export default function FarmerDataCollectionForm() {
                         <label className="block text-sm font-medium text-gray-700 mb-1">Total Land Size*</label>
                         <input 
                           type="number" 
-                          className="w-full p-2 border border-gray-300 rounded-md"
+                          name="totalLandSize"
+                          className={`w-full p-2 border ${formErrors.totalLandSize ? 'border-red-500' : 'border-gray-300'} rounded-md`}
                           value={formData.totalLandSize}
                           onChange={(e) => handleInputChange('totalLandSize', e.target.value)}
                           required
                         />
+                        {formErrors.totalLandSize && (
+                          <p className="mt-1 text-sm text-red-600">{formErrors.totalLandSize}</p>
+                        )}
                       </div>
                       <div className="w-24">
                         <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
@@ -345,7 +426,8 @@ export default function FarmerDataCollectionForm() {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Soil Type*</label>
                       <select 
-                        className="w-full p-2 border border-gray-300 rounded-md"
+                        name="soilType"
+                        className={`w-full p-2 border ${formErrors.soilType ? 'border-red-500' : 'border-gray-300'} rounded-md`}
                         value={formData.soilType}
                         onChange={(e) => handleInputChange('soilType', e.target.value)}
                         required
@@ -359,6 +441,9 @@ export default function FarmerDataCollectionForm() {
                         <option value="chalky">Chalky</option>
                         <option value="other">Other</option>
                       </select>
+                      {formErrors.soilType && (
+                        <p className="mt-1 text-sm text-red-600">{formErrors.soilType}</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Land Topography</label>
@@ -379,7 +464,8 @@ export default function FarmerDataCollectionForm() {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Irrigation Source*</label>
                       <select 
-                        className="w-full p-2 border border-gray-300 rounded-md"
+                        name="irrigationSource"
+                        className={`w-full p-2 border ${formErrors.irrigationSource ? 'border-red-500' : 'border-gray-300'} rounded-md`}
                         value={formData.irrigationSource}
                         onChange={(e) => handleInputChange('irrigationSource', e.target.value)}
                         required
@@ -393,6 +479,9 @@ export default function FarmerDataCollectionForm() {
                         <option value="municipal">Municipal Supply</option>
                         <option value="none">None</option>
                       </select>
+                      {formErrors.irrigationSource && (
+                        <p className="mt-1 text-sm text-red-600">{formErrors.irrigationSource}</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Irrigation System</label>
@@ -435,6 +524,7 @@ export default function FarmerDataCollectionForm() {
             {/* Crop Information Section */}
             <div className="mb-6">
               <button 
+                type="button"
                 className="w-full flex items-center justify-between bg-green-50 p-4 rounded-lg mb-4"
                 onClick={() => toggleSection('crops')}
               >
@@ -471,12 +561,16 @@ export default function FarmerDataCollectionForm() {
                           <label className="block text-sm font-medium text-gray-700 mb-1">Crop Name*</label>
                           <input 
                             type="text" 
-                            className="w-full p-2 border border-gray-300 rounded-md"
+                            name={`primaryCrops_${index}_cropName`}
+                            className={`w-full p-2 border ${formErrors[`primaryCrops_${index}_cropName`] ? 'border-red-500' : 'border-gray-300'} rounded-md`}
                             placeholder="e.g., Rice, Wheat, Corn"
                             value={crop.cropName}
                             onChange={(e) => handleArrayInputChange('primaryCrops', index, 'cropName', e.target.value)}
                             required
                           />
+                          {formErrors[`primaryCrops_${index}_cropName`] && (
+                            <p className="mt-1 text-sm text-red-600">{formErrors[`primaryCrops_${index}_cropName`]}</p>
+                          )}
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Variety Name</label>
@@ -493,7 +587,8 @@ export default function FarmerDataCollectionForm() {
                           <div className="flex items-center">
                             <input 
                               type="number" 
-                              className="w-full p-2 border border-gray-300 rounded-md"
+                              name={`primaryCrops_${index}_areaAllocated`}
+                              className={`w-full p-2 border ${formErrors[`primaryCrops_${index}_areaAllocated`] ? 'border-red-500' : 'border-gray-300'} rounded-md`}
                               placeholder="Area"
                               value={crop.areaAllocated}
                               onChange={(e) => handleArrayInputChange('primaryCrops', index, 'areaAllocated', e.target.value)}
@@ -501,6 +596,9 @@ export default function FarmerDataCollectionForm() {
                             />
                             <span className="ml-2 text-gray-600">{formData.landSizeUnit}</span>
                           </div>
+                          {formErrors[`primaryCrops_${index}_areaAllocated`] && (
+                            <p className="mt-1 text-sm text-red-600">{formErrors[`primaryCrops_${index}_areaAllocated`]}</p>
+                          )}
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Harvest Frequency</label>
@@ -546,6 +644,7 @@ export default function FarmerDataCollectionForm() {
             {/* Historical Data Section */}
             <div className="mb-6">
               <button 
+                type="button"
                 className="w-full flex items-center justify-between bg-green-50 p-4 rounded-lg mb-4"
                 onClick={() => toggleSection('historical')}
               >
@@ -682,194 +781,324 @@ export default function FarmerDataCollectionForm() {
           </>
         );
         
-        case 3:
-            return (
-              <>
-                <h2 className="text-xl font-bold mb-6">Climate & Financial Data</h2>
-                
-                {/* Climate Conditions Section */}
-                <div className="mb-6">
-                  <button 
-                    className="w-full flex items-center justify-between bg-green-50 p-4 rounded-lg mb-4"
-                    onClick={() => toggleSection('climate')}
-                  >
-                    <div className="flex items-center">
-                      <div className="bg-green-100 p-2 rounded-full mr-3">
-                        <CloudRain className="text-green-600" size={20} />
-                      </div>
-                      <span className="font-medium">Climate Conditions</span>
+      case 3:
+        return (
+          <>
+            <h2 className="text-xl font-bold mb-6">Climate & Financial Data</h2>
+            
+            {/* Climate Conditions Section */}
+            <div className="mb-6">
+              <button 
+                type="button"
+                className="w-full flex items-center justify-between bg-green-50 p-4 rounded-lg mb-4"
+                onClick={() => toggleSection('climate')}
+              >
+                <div className="flex items-center">
+                  <div className="bg-green-100 p-2 rounded-full mr-3">
+                    <CloudRain className="text-green-600" size={20} />
+                  </div>
+                  <span className="font-medium">Climate Conditions</span>
+                </div>
+                {expandedSection === 'climate' ? <ChevronDown /> : <ChevronRight />}
+              </button>
+              
+              {expandedSection === 'climate' && (
+                <div className="bg-white p-6 rounded-lg shadow-sm mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Average Annual Rainfall (mm)</label>
+                      <input 
+                        type="number" 
+                        className="w-full p-2 border border-gray-300 rounded-md"
+                        placeholder="e.g., 800"
+                        value={formData.averageRainfall}
+                        onChange={(e) => handleInputChange('averageRainfall', e.target.value)}
+                      />
                     </div>
-                    {expandedSection === 'climate' ? <ChevronDown /> : <ChevronRight />}
-                  </button>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Min Temperature (°C)</label>
+                        <input 
+                          type="number" 
+                          className="w-full p-2 border border-gray-300 rounded-md"
+                          placeholder="e.g., 15"
+                          value={formData.temperatureRange.min}
+                          onChange={(e) => handleNestedInputChange('temperatureRange', 'min', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Max Temperature (°C)</label>
+                        <input 
+                          type="number" 
+                          className="w-full p-2 border border-gray-300 rounded-md"
+                          placeholder="e.g., 35"
+                          value={formData.temperatureRange.max}
+                          onChange={(e) => handleNestedInputChange('temperatureRange', 'max', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Min Humidity (%)</label>
+                        <input 
+                          type="number" 
+                          className="w-full p-2 border border-gray-300 rounded-md"
+                          placeholder="e.g., 30"
+                          min="0"
+                          max="100"
+                          value={formData.humidityLevels.min}
+                          onChange={(e) => handleNestedInputChange('humidityLevels', 'min', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Max Humidity (%)</label>
+                        <input 
+                          type="number" 
+                          className="w-full p-2 border border-gray-300 rounded-md"
+                          placeholder="e.g., 80"
+                          min="0"
+                          max="100"
+                          value={formData.humidityLevels.max}
+                          onChange={(e) => handleNestedInputChange('humidityLevels', 'max', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
                   
-                  {expandedSection === 'climate' && (
-                    <div className="bg-white p-6 rounded-lg shadow-sm mb-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Average Annual Rainfall (mm)</label>
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Major Weather Issues</label>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      {weatherIssueOptions.map((issue) => (
+                        <label key={issue} className="flex items-center p-2 border border-gray-300 rounded-md">
                           <input 
-                            type="number" 
-                            className="w-full p-2 border border-gray-300 rounded-md"
-                            placeholder="e.g., 800"
-                            value={formData.averageRainfall}
-                            onChange={(e) => handleInputChange('averageRainfall', e.target.value)}
+                            type="checkbox" 
+                            className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                            checked={formData.majorWeatherIssues.includes(issue)}
+                            onChange={() => toggleArrayItem('majorWeatherIssues', issue)}
                           />
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Min Temperature (°C)</label>
-                            <input 
-                              type="number" 
-                              className="w-full p-2 border border-gray-300 rounded-md"
-                              placeholder="e.g., 15"
-                              value={formData.temperatureRange.min}
-                              onChange={(e) => handleNestedInputChange('temperatureRange', 'min', e.target.value)}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Max Temperature (°C)</label>
-                            <input 
-                              type="number" 
-                              className="w-full p-2 border border-gray-300 rounded-md"
-                              placeholder="e.g., 35"
-                              value={formData.temperatureRange.max}
-                              onChange={(e) => handleNestedInputChange('temperatureRange', 'max', e.target.value)}
-                            />
-                          </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Min Humidity (%)</label>
-                            <input 
-                              type="number" 
-                              className="w-full p-2 border border-gray-300 rounded-md"
-                              placeholder="e.g., 30"
-                              min="0"
-                              max="100"
-                              value={formData.humidityLevels.min}
-                              onChange={(e) => handleNestedInputChange('humidityLevels', 'min', e.target.value)}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Max Humidity (%)</label>
-                            <input 
-                              type="number" 
-                              className="w-full p-2 border border-gray-300 rounded-md"
-                              placeholder="e.g., 80"
-                              min="0"
-                              max="100"
-                              value={formData.humidityLevels.max}
-                              onChange={(e) => handleNestedInputChange('humidityLevels', 'max', e.target.value)}
-                            />
-                          </div>
-                        </div>
+                          <span className="ml-2 text-sm">{issue}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Financial Information Section */}
+            <div className="mb-6">
+              <button 
+                type="button"
+                className="w-full flex items-center justify-between bg-green-50 p-4 rounded-lg mb-4"
+                onClick={() => toggleSection('financial')}
+              >
+                <div className="flex items-center">
+                  <div className="bg-green-100 p-2 rounded-full mr-3">
+                    <DollarSign className="text-green-600" size={20} />
+                  </div>
+                  <span className="font-medium">Financial Information</span>
+                </div>
+                {expandedSection === 'financial' ? <ChevronDown /> : <ChevronRight />}
+              </button>
+              
+              {expandedSection === 'financial' && (
+                <div className="bg-white p-6 rounded-lg shadow-sm mb-4">
+                  <p className="text-sm text-gray-600 mb-4">Please enter your financial information below. All fields are optional but will help us provide better recommendations.</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Annual Investment (USD)</label>
+                      <input 
+                        type="text" 
+                        className="w-full p-2 border border-gray-300 rounded-md"
+                        placeholder="e.g., 5000"
+                        value={formData.annualInvestment}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^\d]/g, '');
+                          handleInputChange('annualInvestment', value);
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Irrigation Cost (USD)</label>
+                      <input 
+                        type="text" 
+                        className="w-full p-2 border border-gray-300 rounded-md"
+                        placeholder="e.g., 1200"
+                        value={formData.irrigationCost}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^\d]/g, '');
+                          handleInputChange('irrigationCost', value);
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Fertilizer Cost (USD)</label>
+                      <input 
+                        type="text" 
+                        className="w-full p-2 border border-gray-300 rounded-md"
+                        placeholder="e.g., 800"
+                        value={formData.fertilizerCost}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^\d]/g, '');
+                          handleInputChange('fertilizerCost', value);
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Pesticide Cost (USD)</label>
+                      <input 
+                        type="text" 
+                        className="w-full p-2 border border-gray-300 rounded-md"
+                        placeholder="e.g., 500"
+                        value={formData.pesticideCost}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^\d]/g, '');
+                          handleInputChange('pesticideCost', value);
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Labor Cost (USD)</label>
+                      <input 
+                        type="text" 
+                        className="w-full p-2 border border-gray-300 rounded-md"
+                        placeholder="e.g., 2000"
+                        value={formData.laborCost}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^\d]/g, '');
+                          handleInputChange('laborCost', value);
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Expected ROI (%)</label>
+                      <input 
+                        type="text" 
+                        className="w-full p-2 border border-gray-300 rounded-md"
+                        placeholder="e.g., 15"
+                        value={formData.expectedRoi}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^\d]/g, '');
+                          if (value === '' || (parseInt(value) >= 0 && parseInt(value) <= 100)) {
+                            handleInputChange('expectedRoi', value);
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex justify-between mt-6">
+              <button
+                type="button"
+                className="bg-gray-300 text-gray-700 px-6 py-2 rounded-md hover:bg-gray-400"
+                onClick={prevStep}
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700"
+                onClick={nextStep}
+              >
+                Next
+              </button>
+            </div>
+          </>
+        );
+        
+      case 4:
+        return (
+          <div className="bg-white p-6 rounded-lg shadow-sm">
+            {isLoading ? (
+              <div className="text-center p-8">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-green-500 border-t-transparent"></div>
+                <p className="mt-2 text-gray-600">Submitting your data...</p>
+              </div>
+            ) : error ? (
+              <div className="text-center p-8">
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                  <p>{error}</p>
+                  <button 
+                    onClick={() => setError(null)}
+                    className="mt-4 bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              </div>
+            ) : formSubmitted ? (
+              <div className="text-center p-8">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100">
+                  <Check className="text-green-600" size={32} />
+                </div>
+                <h3 className="mt-4 text-xl font-medium text-gray-900">Form Submitted Successfully!</h3>
+                <p className="mt-2 text-gray-600">Thank you for providing your farm information.</p>
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="mt-6 bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700"
+                >
+                  Submit Another Form
+                </button>
+              </div>
+            ) : (
+              <>
+                <h2 className="text-xl font-bold mb-6">Review & Submit</h2>
+                <p className="mb-4">Please review your information before submitting:</p>
+                
+                {Object.keys(formErrors).length > 0 && (
+                  <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+                    <div className="flex">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
                       </div>
-                      
-                      <div className="mt-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Major Weather Issues</label>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                          {weatherIssueOptions.map((issue) => (
-                            <label key={issue} className="flex items-center p-2 border border-gray-300 rounded-md">
-                              <input 
-                                type="checkbox" 
-                                className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                                checked={formData.majorWeatherIssues.includes(issue)}
-                                onChange={() => toggleArrayItem('majorWeatherIssues', issue)}
-                              />
-                              <span className="ml-2 text-sm">{issue}</span>
-                            </label>
-                          ))}
+                      <div className="ml-3">
+                        <h3 className="text-sm font-medium text-red-800">
+                          There {Object.keys(formErrors).length === 1 ? 'is' : 'are'} {Object.keys(formErrors).length} error{Object.keys(formErrors).length === 1 ? '' : 's'} in your form
+                        </h3>
+                        <div className="mt-2 text-sm text-red-700">
+                          <ul className="list-disc pl-5 space-y-1">
+                            {Object.entries(formErrors).map(([field, error]) => (
+                              <li key={field}>{error}</li>
+                            ))}
+                          </ul>
                         </div>
                       </div>
                     </div>
-                  )}
+                  </div>
+                )}
+                
+                <div className="border-t border-gray-200 pt-4 mb-4">
+                  <h3 className="font-medium">General Information</h3>
+                  <p>Farmer Name: {formData.farmerName || <span className="text-red-500">Missing</span>}</p>
+                  <p>Farm Name: {formData.farmName || 'Not provided'}</p>
+                  <p>Location: {formData.location || <span className="text-red-500">Missing</span>}</p>
+                  <p>Contact Number: {formData.contactNumber || <span className="text-red-500">Missing</span>}</p>
+                  <p>Email: {formData.email || 'Not provided'}</p>
                 </div>
                 
-                {/* Financial Information Section */}
-                <div className="mb-6">
-                  <button 
-                    className="w-full flex items-center justify-between bg-green-50 p-4 rounded-lg mb-4"
-                    onClick={() => toggleSection('financial')}
-                  >
-                    <div className="flex items-center">
-                      <div className="bg-green-100 p-2 rounded-full mr-3">
-                        <DollarSign className="text-green-600" size={20} />
-                      </div>
-                      <span className="font-medium">Financial Information</span>
+                <div className="border-t border-gray-200 pt-4 mb-4">
+                  <h3 className="font-medium">Land Details</h3>
+                  <p>Total Land Size: {formData.totalLandSize ? `${formData.totalLandSize} ${formData.landSizeUnit}` : <span className="text-red-500">Missing</span>}</p>
+                  <p>Soil Type: {formData.soilType || <span className="text-red-500">Missing</span>}</p>
+                  <p>Irrigation Source: {formData.irrigationSource || <span className="text-red-500">Missing</span>}</p>
+                </div>
+                
+                <div className="border-t border-gray-200 pt-4 mb-4">
+                  <h3 className="font-medium">Crop Information</h3>
+                  {formData.primaryCrops.map((crop, index) => (
+                    <div key={index} className="mb-2">
+                      <p>Crop {index + 1}: {crop.cropName || <span className="text-red-500">Missing</span>}</p>
+                      <p className="ml-4">Variety: {crop.varietyName || 'Not specified'}</p>
+                      <p className="ml-4">Area: {crop.areaAllocated ? `${crop.areaAllocated} ${formData.landSizeUnit}` : <span className="text-red-500">Missing</span>}</p>
                     </div>
-                    {expandedSection === 'financial' ? <ChevronDown /> : <ChevronRight />}
-                  </button>
-                  
-                  {expandedSection === 'financial' && (
-                    <div className="bg-white p-6 rounded-lg shadow-sm mb-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Annual Investment (USD)</label>
-                          <input 
-                            type="number" 
-                            className="w-full p-2 border border-gray-300 rounded-md"
-                            placeholder="Total annual investment"
-                            value={formData.annualInvestment}
-                            onChange={(e) => handleInputChange('annualInvestment', e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Irrigation Cost (USD)</label>
-                          <input 
-                            type="number" 
-                            className="w-full p-2 border border-gray-300 rounded-md"
-                            placeholder="Annual irrigation cost"
-                            value={formData.irrigationCost}
-                            onChange={(e) => handleInputChange('irrigationCost', e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Fertilizer Cost (USD)</label>
-                          <input 
-                            type="number" 
-                            className="w-full p-2 border border-gray-300 rounded-md"
-                            placeholder="Annual fertilizer cost"
-                            value={formData.fertilizerCost}
-                            onChange={(e) => handleInputChange('fertilizerCost', e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Pesticide Cost (USD)</label>
-                          <input 
-                            type="number" 
-                            className="w-full p-2 border border-gray-300 rounded-md"
-                            placeholder="Annual pesticide cost"
-                            value={formData.pesticideCost}
-                            onChange={(e) => handleInputChange('pesticideCost', e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Labor Cost (USD)</label>
-                          <input 
-                            type="number" 
-                            className="w-full p-2 border border-gray-300 rounded-md"
-                            placeholder="Annual labor cost"
-                            value={formData.laborCost}
-                            onChange={(e) => handleInputChange('laborCost', e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Expected ROI (%)</label>
-                          <input 
-                            type="number" 
-                            className="w-full p-2 border border-gray-300 rounded-md"
-                            placeholder="Expected return on investment"
-                            min="0"
-                            max="100"
-                            value={formData.expectedRoi}
-                            onChange={(e) => handleInputChange('expectedRoi', e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  ))}
                 </div>
                 
                 <div className="flex justify-between mt-6">
@@ -883,88 +1112,60 @@ export default function FarmerDataCollectionForm() {
                   <button
                     type="button"
                     className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700"
-                    onClick={nextStep}
+                    onClick={handleSubmit}
                   >
-                    Next
+                    Submit
                   </button>
                 </div>
               </>
-            );
+            )}
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
 
-            case 4:
   return (
-    <div className="bg-white p-6 rounded-lg shadow-sm">
-      {isLoading ? (
-        <div className="text-center p-8">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-green-500 border-t-transparent"></div>
-          <p className="mt-2 text-gray-600">Submitting your data...</p>
-        </div>
-      ) : error ? (
-        <div className="text-center p-8">
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-            <p>{error}</p>
-            <button 
-              onClick={() => setError(null)}
-              className="mt-4 bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600"
-            >
-              Try Again
-            </button>
-          </div>
-        </div>
-      ) : formSubmitted ? (
-        <div className="text-center p-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100">
-            <Check className="text-green-600" size={32} />
-          </div>
-          <h3 className="mt-4 text-xl font-medium text-gray-900">Form Submitted Successfully!</h3>
-          <p className="mt-2 text-gray-600">Thank you for providing your farm information.</p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="mt-6 bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700"
-          >
-            Submit Another Form
-          </button>
-        </div>
-      ) : (
-        <>
-          <h2 className="text-xl font-bold mb-6">Review & Submit</h2>
-          <p className="mb-4">Please review your information before submitting:</p>
-          
-          <div className="border-t border-gray-200 pt-4 mb-4">
-            <h3 className="font-medium">General Information</h3>
-            <p>Farmer Name: {formData.farmerName}</p>
-            <p>Farm Name: {formData.farmName || 'Not provided'}</p>
-            <p>Location: {formData.location}</p>
-            {/* Add more review fields */}
+    <div className="bg-gray-50 min-h-screen">
+      <Navbar />
+      <main className="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md p-6">
+          {/* Progress indicator */}
+          <div className="mb-8">
+            <div className="flex justify-between mb-2">
+              {[1, 2, 3, 4].map((step) => (
+                <div 
+                  key={step}
+                  className={`flex flex-col items-center ${currentStep >= step ? 'text-green-600' : 'text-gray-400'}`}
+                >
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep >= step ? 'bg-green-100' : 'bg-gray-100'}`}>
+                    {currentStep > step ? (
+                      <Check className="text-green-600" size={16} />
+                    ) : (
+                      <span>{step}</span>
+                    )}
+                  </div>
+                  <span className="text-xs mt-1">
+                    {step === 1 && 'Basic Info'}
+                    {step === 2 && 'Crop Data'}
+                    {step === 3 && 'Climate/Finance'}
+                    {step === 4 && 'Review'}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-green-600 h-2 rounded-full" 
+                style={{ width: `${(currentStep / 4) * 100}%` }}
+              ></div>
+            </div>
           </div>
           
-          <div className="flex justify-between mt-6">
-            <button
-              type="button"
-              className="bg-gray-300 text-gray-700 px-6 py-2 rounded-md hover:bg-gray-400"
-              onClick={prevStep}
-            >
-              Previous
-            </button>
-            <button
-              type="submit"
-              className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700"
-              onClick={handleSubmit}
-            >
-              Submit
-            </button>
-          </div>
-        </>
-      )}
+          {renderFormStep()}
+        </form>
+      </main>
     </div>
-  );
-        };
-        
-  }
-  const [formErrors, setFormErrors] = useState({});
-  return (
-    <form className="bg-white rounded-lg shadow-md p-6">
-      {renderFormStep()}
-    </form>
   );
 }
