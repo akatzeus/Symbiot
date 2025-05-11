@@ -1,0 +1,229 @@
+#Reciever
+#include <SoftwareSerial.h>
+#include <XBee.h>
+
+SoftwareSerial XBee(2, 3);  // RX, TX
+char receivedChar = 0;  // to store received XBee command
+bool autonomousInterrupted = false;  // flag to interrupt autonomous mode
+
+
+// Motor control pins
+const int leftMotorForwardPin = 7;
+const int leftMotorBackwardPin = 8;
+const int rightMotorForwardPin = 9;
+const int rightMotorBackwardPin = 10;
+
+char data = '0';
+bool remoteControlMode = false;
+
+unsigned long actionStartTime = 0;
+const unsigned long actionDuration = 5000;  // 5 seconds
+
+void setup() {
+  pinMode(leftMotorForwardPin, OUTPUT);
+  pinMode(leftMotorBackwardPin, OUTPUT);
+  pinMode(rightMotorForwardPin, OUTPUT);
+  pinMode(rightMotorBackwardPin, OUTPUT);
+
+  Serial.begin(9600);
+  XBee.begin(9600);
+}
+
+void loop() {
+  if (XBee.available()) {
+    data = XBee.read();
+    Serial.print("Received: ");
+    Serial.println(data);
+
+    if (data == '1') {
+      remoteControlMode = false;
+      runAutonomousMode();
+    } else if (data == '2') {
+      remoteControlMode = true;
+      stopRobot();
+      Serial.println("Switched to Remote Control Mode");
+    }
+  }
+
+  if (remoteControlMode) {
+    handleRemoteControl();
+  }
+}
+
+void handleRemoteControl() {
+  if (data == '3') {
+    moveForward();
+  }
+  else if (data == '4') {
+    moveBackward();
+  }
+  else if (data == '5') {
+    turnLeft();
+  }
+  else if (data == '6') {
+    turnRight();
+  }
+  else if (data == '7') {
+    stopRobot();
+  }
+}
+
+void runAutonomousMode() {
+  Serial.println("Autonomous Mode Starting after 5 seconds...");
+  
+  stopRobot();
+  delayWithInterrupt(5000);  // Wait 5 seconds before starting
+
+  if (autonomousInterrupted) return;
+
+  Serial.println("Starting autonomous movement...");
+
+  // Move-Stop 5 times
+  moveStopCycle(5);
+  
+  // Turn right
+  Serial.println("Turning right...");
+  turnRight();
+  delayWithInterrupt(1000);
+  stopRobot();
+
+  // Move-Stop 3 times
+  moveStopCycle(3);
+
+  // Turn right
+  Serial.println("Turning right...");
+  turnRight();
+  delayWithInterrupt(1000);
+  stopRobot();
+
+  // Move-Stop 5 times
+  moveStopCycle(5);
+
+  // Finally stop
+  Serial.println("Bot has completed the sequence and stopped.");
+  stopRobot();
+
+  // End the program
+  while (1);  // Infinite loop to do nothing
+}
+
+void moveStopCycle(int times) {
+  for (int i = 0; i < times; i++) {
+    moveForward();
+    delayWithInterrupt(250);  // Move forward for 250ms
+    stopRobot();
+    delayWithInterrupt(4000); // Stop for 4 seconds
+    if (autonomousInterrupted) return;
+  }
+}
+
+// Basic movement functions
+void moveForward() {
+  digitalWrite(leftMotorForwardPin, HIGH);
+  digitalWrite(leftMotorBackwardPin, LOW);
+  digitalWrite(rightMotorForwardPin, HIGH);
+  digitalWrite(rightMotorBackwardPin, LOW);
+}
+
+void moveBackward() {
+  digitalWrite(leftMotorForwardPin, LOW);
+  digitalWrite(leftMotorBackwardPin, HIGH);
+  digitalWrite(rightMotorForwardPin, LOW);
+  digitalWrite(rightMotorBackwardPin, HIGH);
+}
+
+void turnLeft() {
+  digitalWrite(leftMotorForwardPin, LOW);
+  digitalWrite(leftMotorBackwardPin, HIGH);
+  digitalWrite(rightMotorForwardPin, HIGH);
+  digitalWrite(rightMotorBackwardPin, LOW);
+}
+
+void turnRight() {
+  digitalWrite(leftMotorForwardPin, HIGH);
+  digitalWrite(leftMotorBackwardPin, LOW);
+  digitalWrite(rightMotorForwardPin, LOW);
+  digitalWrite(rightMotorBackwardPin, HIGH);
+}
+
+void stopRobot() {
+  digitalWrite(leftMotorForwardPin, LOW);
+  digitalWrite(leftMotorBackwardPin, LOW);
+  digitalWrite(rightMotorForwardPin, LOW);
+  digitalWrite(rightMotorBackwardPin, LOW);
+}
+
+// Timed movement functions for autonomous
+void moveForwardFor(int duration) {
+  Serial.println("Moving Forward...");
+  moveForward();
+  delay(duration);
+}
+
+void turnLeftFor(int duration) {
+  Serial.println("Turning Left...");
+  turnLeft();
+  delay(duration);
+}
+
+void turnRightFor(int duration) {
+  Serial.println("Turning Right...");
+  turnRight();
+  delay(duration);
+}
+
+void stopWithDelay() {
+  stopRobot();
+  Serial.println("Stopping for 1 second...");
+  delay(1000);
+}
+
+void delayWithInterrupt(unsigned long ms) {
+  unsigned long startTime = millis();
+  while (millis() - startTime < ms) {
+    if (Serial.available()) {
+      receivedChar = Serial.read();
+      if (receivedChar == '2') { // Remote mode signal
+        autonomousInterrupted = true;
+        Serial.println("Autonomous Mode Interrupted. Switching to Remote Mode.");
+        break;
+      }
+    }
+    delay(1);  // short delay to avoid busy-waiting
+  }
+}
+
+#Transmitter
+#include <SoftwareSerial.h>
+
+SoftwareSerial XBee(2, 3);  // RX, TX
+
+char input;
+
+void setup() {
+  Serial.begin(9600);      // For serial monitor
+  XBee.begin(9600);        // XBee communication
+
+  Serial.println("XBee Transmitter Ready.");
+  Serial.println("Press:");
+  Serial.println("1: Autonomous Mode");
+  Serial.println("2: Remote Control Mode");
+  Serial.println("3: Move Forward");
+  Serial.println("4: Move Backward");
+  Serial.println("5: Turn Left");
+  Serial.println("6: Turn Right");
+  Serial.println("7: Stop");
+}
+
+void loop() {
+  if (Serial.available()) {
+    input = Serial.read();
+
+    // Echo to Serial Monitor
+    Serial.print("Sending: ");
+    Serial.println(input);
+
+    // Send to XBee
+    XBee.write(input);
+  }
+}
